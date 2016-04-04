@@ -20,13 +20,18 @@ class Gitify extends Application
      */
     public static $contentSeparator = "\n-----\n\n";
     /**
+     * Universal directory separator for *Nix and Windows
+     *
+     * @var string
+     */
+    public static $directorySeparator = "/";
+    /**
      * @var \modX
      */
     public static $modx;
 
     public $environment = array();
     public $repository;
-    public $config;
 
     /**
      * Takes in an array of data, and turns it into blissful YAML using Symfony's YAML component.
@@ -82,7 +87,7 @@ class Gitify extends Application
     /**
      * @throws \RuntimeException
      */
-    public function loadConfig()
+    public static function loadConfig()
     {
         if (!file_exists(GITIFY_WORKING_DIR . '.gitify')) {
             throw new \RuntimeException("Directory is not a Gitify directory: " . GITIFY_WORKING_DIR);
@@ -93,7 +98,6 @@ class Gitify extends Application
             throw new \RuntimeException("Error: " . GITIFY_WORKING_DIR . ".gitify file is not valid YAML, or is empty.");
         }
 
-        $this->config = $config;
         return $config;
     }
 
@@ -104,6 +108,10 @@ class Gitify extends Application
     {
         try {
             if (!$this->repository) {
+                $gitPath = self::loadMODX()->getOption('gitify.git_path', null, '/usr/bin/git');
+                if (!empty($gitPath)) {
+                    \Git::set_bin($gitPath);
+                }
                 $repositoryPath = self::loadMODX()->getOption('gitify.repository_path', null, MODX_BASE_PATH, true);
                 $this->repository = \Git::open($repositoryPath);
             }
@@ -125,7 +133,7 @@ class Gitify extends Application
             return $this->environment;
         }
 
-        $config = $this->loadConfig();
+        $config = static::loadConfig();
 
         $envs = array();
 
@@ -154,8 +162,8 @@ class Gitify extends Application
         }
 
         $host = (isset($_SERVER['HTTP_HOST'])) ? $_SERVER['HTTP_HOST'] : MODX_HTTP_HOST;
-        if (substr($host, 4) === 'www.') {
-            $host = substr($host, 0, 4);
+        if (substr($host, 0, 4) == 'www.') {
+            $host = substr($host, 4);
         }
 
         $environment = (isset($envs[$host])) ? $envs[$host] : array();
