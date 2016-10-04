@@ -40,6 +40,12 @@ class InstallPackageCommand extends BaseCommand
                 'When specified, all packages defined in the .gitify config will be installed.'
             )
             ->addOption(
+                'save',
+                's',
+                InputOption::VALUE_NONE,
+                'When specified, save package into .gitify file, if --all specified it do nothing'
+            )
+            ->addOption(
                 'interactive',
                 'i',
                 InputOption::VALUE_NONE,
@@ -283,14 +289,55 @@ class InstallPackageCommand extends BaseCommand
                 $obj = $response->getObject();
                 if ($package = $this->modx->getObject('transport.modTransportPackage', array('signature' => $obj['signature']))) {
                     // Install the package
-                    return $package->install($options);
+                    if ($package->install($options)){
+                        if ($this->input->getOption('save') && !$this->input->getOption('all')) {
+                            $this->savePackageToFile($package->get('signature'), $provider);
+                        }
+                        return true;
+                    }
+                    else {
+                        return false;
+                    }
                 }
             }
         }
 
         return true;
     }
+    private function savePackageToFile($packageSignature, $provider){
+        $packages = isset($this->config['packages']) ? $this->config['packages'] : array();
+        $name = $provider->get('name');
+        if ($packages && array_key_exists($name, $packages)){
+            if (in_array($packageSignature, $packages[$name])) {
+                return false;
+            }
+        }
 
+        $configProvider = isset($packages[$name]) ? $packages[$name]: array();
+        if (!$configProvider) {
+            /** @var \modTransportProvider $provider */
+            $configProvider = array(
+                'service_url' => $provider->get('service_url')
+            );
+            if ($provider->get('description')) {
+                $configProvider['description'] = $provider->get('description');
+            }
+            if ($provider->get('username')) {
+                $configProvider['username'] = $provider->get('username');
+            }
+            if ($provider->get('api_key')) {
+                $key = $provider->get('api_key');
+                file_put_contents(GITIFY_WORKING_DIR . '.' . $name . '.key', $key);
+                $configProvider['api_key'] = '.' . $name . '.key';
+            }
+        }
+        $configProvider['packages'][] = $packageSignature;
+        $packages[$name] = $configProvider;
+        $config = Gitify::toYAML($this->config);
+        file_put_contents(GITIFY_WORKING_DIR . '.gitify', $config);
+        $this->output->writeln("<info>Add {$packageSignature} to .gitify</info>");
+        return true;
+    }
     /**
      * Sets the internal interactive flag
      *
