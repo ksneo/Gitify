@@ -333,6 +333,7 @@ class InstallPackageCommand extends BaseCommand
         }
         $configProvider['packages'][] = $packageSignature;
         $packages[$name] = $configProvider;
+        $this->config['packages'] = $packages;
         $config = Gitify::toYAML($this->config);
         file_put_contents(GITIFY_WORKING_DIR . '.gitify', $config);
         $this->output->writeln("<info>Add {$packageSignature} to .gitify</info>");
